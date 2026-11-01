@@ -1,0 +1,10 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-cp6-ai
+    environment:
+      POSTGRES_DB: mercado_express_ai
+      POSTGRES_USER: mercado
+      POSTGRES_PASSWORD: mercado123
+    ports:
+      - "5434:5432"

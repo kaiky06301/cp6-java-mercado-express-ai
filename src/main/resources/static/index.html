@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mercado Express - Assistente Mel</title>
+    <style>
+        :root { --verde: #1b8a4b; --verde-escuro: #136637; --cinza: #f3f5f4; --borda: #dfe5e2; --erro: #b3261e; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: var(--cinza); color: #1d2420; }
+        header { background: var(--verde); color: #fff; padding: 16px 24px; }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        header p { margin: 4px 0 0; opacity: .9; font-size: .9rem; }
+        main { max-width: 1100px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 3fr 2fr; gap: 20px; }
+        section { background: #fff; border: 1px solid var(--borda); border-radius: 10px; padding: 18px; }
+        h2 { margin: 0 0 12px; font-size: 1.1rem; }
+        textarea { width: 100%; min-height: 110px; padding: 10px; border: 1px solid var(--borda); border-radius: 8px; font: inherit; resize: vertical; }
+        .linha { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; flex-wrap: wrap; }
+        .contador { font-size: .8rem; color: #66706b; }
+        button { background: var(--verde); color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font: inherit; cursor: pointer; }
+        button:hover { background: var(--verde-escuro); }
+        button:disabled { background: #9db8a8; cursor: wait; }
+        button.secundario { background: #fff; color: var(--verde); border: 1px solid var(--verde); padding: 6px 12px; font-size: .85rem; }
+        .sugestoes { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+        .sugestoes button { background: #e8f4ed; color: var(--verde-escuro); padding: 6px 10px; font-size: .8rem; }
+        #resposta { margin-top: 16px; padding: 14px; border-radius: 8px; background: #f7faf8; border-left: 4px solid var(--verde); white-space: pre-wrap; line-height: 1.5; display: none; }
+        #resposta.erro { border-left-color: var(--erro); background: #fdf1f0; color: var(--erro); }
+        .meta { font-size: .78rem; color: #66706b; margin-top: 8px; }
+        #historico { list-style: none; padding: 0; margin: 0; max-height: 560px; overflow-y: auto; }
+        #historico li { border-bottom: 1px solid var(--borda); padding: 10px 0; }
+        #historico .pergunta { font-weight: 600; }
+        #historico .texto { white-space: pre-wrap; font-size: .9rem; margin-top: 4px; max-height: 120px; overflow: hidden; }
+        @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<header>
+    <h1>🛒 Mercado Express — Assistente Mel</h1>
+    <p>Atendimento com IA (Spring AI + Ollama): produtos, receitas, entregas, pagamentos e trocas.</p>
+</header>
+<main>
+    <section>
+        <h2>Faça sua pergunta</h2>
+        <textarea id="mensagem" maxlength="1000"
+                  placeholder="Ex.: Quero fazer um almoço para 4 pessoas, o que preciso comprar?"></textarea>
+        <div class="linha">
+            <span class="contador"><span id="contador">0</span>/1000 caracteres</span>
+            <button id="enviar">Enviar</button>
+        </div>
+        <div class="sugestoes">
+            <button data-q="Quais formas de pagamento vocês aceitam?">Formas de pagamento</button>
+            <button data-q="O frete é grátis? Vocês entregam em Guarulhos?">Frete e entrega</button>
+            <button data-q="Monte uma lista de compras para um café da manhã de domingo para 4 pessoas.">Lista de compras</button>
+            <button data-q="Quem ganhou a Copa do Mundo de 2002?">Pergunta fora do tema</button>
+        </div>
+        <div id="resposta"></div>
+        <div class="meta" id="meta"></div>
+    </section>
+    <section>
+        <div class="linha" style="margin: 0 0 12px">
+            <h2 style="margin:0">Histórico</h2>
+            <button class="secundario" id="atualizar">Atualizar</button>
+        </div>
+        <ul id="historico"></ul>
+    </section>
+</main>
+<script>
+    const campo = document.getElementById('mensagem');
+    const botao = document.getElementById('enviar');
+    const caixa = document.getElementById('resposta');
+    const meta = document.getElementById('meta');
+
+    campo.addEventListener('input', () => document.getElementById('contador').textContent = campo.value.length);
+    campo.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviar(); });
+    botao.addEventListener('click', enviar);
+    document.getElementById('atualizar').addEventListener('click', carregarHistorico);
+    document.querySelectorAll('.sugestoes button').forEach(b => b.addEventListener('click', () => {
+        campo.value = b.dataset.q;
+        campo.dispatchEvent(new Event('input'));
+        enviar();
+    }));
+
+    function formatarData(iso) {
+        return new Date(iso).toLocaleString('pt-BR');
+    }
+
+    function mostrar(texto, erro) {
+        caixa.style.display = 'block';
+        caixa.className = erro ? 'erro' : '';
+        caixa.textContent = texto;
+    }
+
+    async function enviar() {
+        // a validação definitiva é feita na API (POST /api/chat); aqui não bloqueamos para permitir demonstrar o 400
+        botao.disabled = true;
+        botao.textContent = 'Pensando...';
+        meta.textContent = '';
+        mostrar('Consultando o modelo de IA...', false);
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mensagem: campo.value})
+            });
+            const dados = await resp.json();
+            if (!resp.ok) {
+                mostrar(`Erro ${dados.status}: ${dados.mensagem}`, true);
+                return;
+            }
+            mostrar(dados.resposta, false);
+            meta.textContent = `#${dados.id} · ${dados.provedor} / ${dados.modelo} · ${formatarData(dados.dataHora)}`;
+            carregarHistorico();
+        } catch (e) {
+            mostrar('Não foi possível falar com o servidor. Verifique se a aplicação está em execução.', true);
+        } finally {
+            botao.disabled = false;
+            botao.textContent = 'Enviar';
+        }
+    }
+
+    async function carregarHistorico() {
+        const lista = document.getElementById('historico');
+        try {
+            const itens = await (await fetch('/api/historico')).json();
+            lista.innerHTML = '';
+            if (itens.length === 0) {
+                lista.innerHTML = '<li>Nenhuma conversa ainda.</li>';
+                return;
+            }
+            itens.forEach(item => {
+                const li = document.createElement('li');
+                const pergunta = document.createElement('div');
+                pergunta.className = 'pergunta';
+                pergunta.textContent = item.pergunta;
+                const texto = document.createElement('div');
+                texto.className = 'texto';
+                texto.textContent = item.resposta;
+                const info = document.createElement('div');
+                info.className = 'meta';
+                info.textContent = `#${item.id} · ${item.modelo} · ${formatarData(item.dataHora)}`;
+                li.append(pergunta, texto, info);
+                lista.appendChild(li);
+            });
+        } catch (e) {
+            lista.innerHTML = '<li>Não foi possível carregar o histórico.</li>';
+        }
+    }
+
+    carregarHistorico();
+</script>
+</body>
+</html>
