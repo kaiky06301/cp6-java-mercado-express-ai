@@ -13,7 +13,7 @@ FIAP · Tecnologia em Análise e Desenvolvimento de Sistemas (TDS) · Turma **2T
 
 ---
 
-🎥 **Vídeo de demonstração:** LINK_VIDEO
+🎥 **Vídeo de demonstração:** https://youtu.be/jJ7cCUHvdPE
 
 ## 1. Objetivo
 
@@ -270,7 +270,8 @@ e informe a URL ao rodar a aplicação: `DB_URL=jdbc:postgresql://localhost:5432
 
 A tabela é criada automaticamente pelo JPA (`ddl-auto=update`); o script
 [`02-criar-tabela.sql`](scripts/02-criar-tabela.sql) tem a mesma estrutura, e
-[`03-consultas.sql`](scripts/03-consultas.sql) traz as consultas para conferir os registros.
+[`03-consultas.sql`](scripts/03-consultas.sql) traz as consultas para conferir os registros
+(atalho: `./scripts/consultar-historico.sh`, que roda essas consultas no container do Docker).
 
 ### 5.4 Subir a aplicação
 
@@ -390,7 +391,7 @@ GET http://localhost:8080/api/historico?ordem=asc
 
 ![GET /api/historico](docs/img/03-api-historico.jpg)
 
-Registros no banco (`scripts/03-consultas.sql`):
+Registros no banco (`./scripts/consultar-historico.sh`, que executa `scripts/03-consultas.sql`):
 
 ```
  id |         data_hora          | provedor |   modelo   |                   pergunta
@@ -459,7 +460,7 @@ mercado-express-ai/
 ├── mvnw / mvnw.cmd / .mvn/             # Maven Wrapper
 ├── pom.xml
 ├── postman/CP6-Mercado-Express-AI.postman_collection.json
-├── scripts/                            # 01-criar-banco, 02-criar-tabela, 03-consultas
+├── scripts/                            # 01-criar-banco, 02-criar-tabela, 03-consultas, consultar-historico.sh
 ├── docs/img/                           # prints do README
 └── src/
     ├── main/java/br/com/fiap/mercadoexpressai/
